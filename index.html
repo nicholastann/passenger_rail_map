@@ -577,9 +577,10 @@
                     const long1 = cities[i].long
                     const lat2 = cities[j].lat
                     const long2 = cities[j].long
-                    const score = calcScore(calcDistance(lat1, long1, lat2, long2, cities[i].city, cities[j].city), cities[i].population, cities[j].population)
+                    const distance = calcDistance(lat1, long1, lat2, long2, cities[i].city, cities[j].city)
+                    const score = calcScore(distance, cities[i].population, cities[j].population)
 
-                    innerMap.set(cities[j].city, {score, lat1, long1, lat2, long2});
+                    innerMap.set(cities[j].city, {score, distance, lat1, long1, lat2, long2});
                 }
             }
             cityPairs.set(cities[i].city, innerMap);
@@ -621,13 +622,92 @@
         }
 
 
+         function modifiedKruskal(edges, extraEdgesLimit) {
+            const parent = new Map();
+                const rank = new Map();
+
+                for (const edge of edges) {
+                    if (!parent.has(edge.start)) {
+                        parent.set(edge.start, edge.start);
+                        rank.set(edge.start, 0);
+                    }
+                    if (!parent.has(edge.end)) {
+                        parent.set(edge.end, edge.end);
+                        rank.set(edge.end, 0);
+                    }
+                }
+
+                function find(city) {
+                    if (parent.get(city) !== city) parent.set(city, find(parent.get(city)));
+                    return parent.get(city);
+                }
+
+                function union(cityA, cityB) {
+                    const rootA = find(cityA);
+                    const rootB = find(cityB);
+
+                    if (rootA !== rootB) {
+                        const rankA = rank.get(rootA);
+                        const rankB = rank.get(rootB);
+
+                        if (rankA > rankB) parent.set(rootB, rootA);
+                        else if (rankA < rankB) parent.set(rootA, rootB);
+                        else {
+                            parent.set(rootB, rootA);
+                            rank.set(rootA, rankA + 1);
+                        }
+                    }
+                }
+
+                edges.sort((a, b) => {
+                    const dataA = cityPairs.get(a.start).get(a.end) || cityPairs.get(a.end).get(a.start);
+                    const dataB = cityPairs.get(b.start).get(b.end) || cityPairs.get(b.end).get(b.start);
+                    return dataB.score - dataA.score;
+                });
+
+                const mst = [];
+                const extraEdges = [];
+                let extraEdgesCount = 0;
+
+                for (const edge of edges) {
+                    const { start, end } = edge;
+
+                    if (find(start) !== find(end)) {
+                        mst.push(edge);
+                        union(start, end);
+                    }
+                }
+
+                for (const edge of edges) {
+                    const { start, end } = edge;
+
+                    if (find(start) === find(end)) {
+                        const data = cityPairs.get(start).get(end) || cityPairs.get(end).get(start);
+                        if (data && data.distance < 600 && extraEdgesCount < extraEdgesLimit) {
+                            extraEdges.push(edge);
+                            extraEdgesCount++;
+                            union(start, end);
+                        }
+                    }
+
+                    if (extraEdgesCount >= extraEdgesLimit) break;
+                }
+
+                const result = [...mst, ...extraEdges];
+                return result;
+        }
+
+
         const qualifiedCities = getQualifiedCities();
         const edges = createEdges(qualifiedCities);
+        const mstEdges = modifiedKruskal(edges, edges.length*0.75)
 
         console.log("Qualified Cities:", qualifiedCities);
         console.log("Created Edges:", edges);
+        console.log("consolidate Edges: ", mstEdges)
 
-        drawEdges(edges, cityPairs)
+
+        drawEdges(mstEdges, cityPairs)
     }
 
     document.addEventListener("DOMContentLoaded", initMap);
@@ -719,7 +799,7 @@
         <div id="modalContent">
             <span id="closeModal">&times;</span>
             <h2>Passenger Rail Network Algorithm Explanation</h2>
-            <p>This webpage is a visualization of a passenger rail network algorithm.</p>
+            <p>This webpage is a visualization of a hypothetical passenger rail network algorithm.</p>
             <p>The purpose is to determine city pairings within a wider rail network at different thresholds</p>
 
             <h3>How the algorithm works:</h3>
@@ -748,20 +828,11 @@
             </ul>
 
             <p>If a city has a cumulative score (sum of all pairing scores) greater than the threshold, it is included as a qualifying city.</p>
-
-            <h3>City Connections:</h3>
-            <p>Connections between cities are made if the pair score is greater than the threshold. Straight lines are drawn on the map.</p>
-
-            <p>These lines represent complete connectivity webs "as the crow flies". It does not account for geographic obstacles like water, mountains, or existing infrastructure. In real life these webs would be simplified to reduce redundancy.</p>
+            <p>Connections between cities are made if the pair score is greater than the threshold.</p>
+            <p>Finally connections are consolidated using a modified Kruskal's algorithm which selects the top 75% highest scoring direct lines to avoid redundancy.</p>
 
             <h3>Limitations:</h3>
-            <p>
-                The network scoring system is flawed. While I wanted to score connections based on traversal distance of existing connections, I couldn't find a satisfying solution. I experimented with algorithms like A*, Kruskal's, MSTs, BFS, and angular consolidation, but none were producing the outcome I desired.
-            </p>
-
-            <p>
-                As a result, cities are connected directly without considering the most efficient or realistic pathing. Certainly line consolidation would be needed. Use your imagination for what a real network might look like, and take the scores and city qualifications/disqualifications with a grain of salt.
-            </p>
+            <p>These lines are "as the crow flies". It does not account for geographic obstacles like water, mountains, or existing infrastructure. More meticulous line consolidation would be necessary in real life. For major city pairs oftentimes the calculated lines flies straight there with little attention to regional stops.</p>
         </div>
     </div>
 
