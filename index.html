@@ -557,7 +557,7 @@
 
 
         function calcScore(distance, pop1, pop2) {
-            if (distance >= 600) return 0
+            if (distance >= 750) return 0
             else {
                 if (distance < 5) return (pop1 * pop2 / 10000) / (Math.pow((5+distance*2), 2))
                 else if (distance < 50) return (pop1 * pop2 / 100000) / (Math.pow((10+distance), 2))
@@ -683,7 +683,7 @@
 
                     if (find(start) === find(end)) {
                         const data = cityPairs.get(start).get(end) || cityPairs.get(end).get(start);
-                        if (data && data.distance < 600 && extraEdgesCount < extraEdgesLimit) {
+                        if (data && data.distance < 750 && extraEdgesCount < extraEdgesLimit) {
                             extraEdges.push(edge);
                             extraEdgesCount++;
                             union(start, end);
@@ -817,12 +817,12 @@
                     <br>This score represents a wider metro area commuter rail.
                 </li>
                 <li>
-                    <strong>Cities between 50 and 600 miles:</strong>
+                    <strong>Cities between 50 and 750 miles:</strong>
                     <br>(population1 * population2 / 1000000) / (25 + distance * 0.36)<sup>2</sup>
                     <br>This score represents high-speed rail.
                 </li>
                 <li>
-                    <strong>Cities over 600 miles apart:</strong>
+                    <strong>Cities over 750 miles apart:</strong>
                     <br>Score = 0. It's always better to fly between long distance cities.
                 </li>
             </ul>
