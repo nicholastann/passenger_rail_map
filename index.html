@@ -700,7 +700,7 @@
 
         const qualifiedCities = getQualifiedCities();
         const edges = createEdges(qualifiedCities);
-        const mstEdges = modifiedKruskal(edges, edges.length*0.75)
+        const mstEdges = modifiedKruskal(edges, edges.length/2)
 
         console.log("Qualified Cities:", qualifiedCities);
         console.log("Created Edges:", edges);
@@ -828,7 +828,7 @@
             </ul>
 
             <p>If a city has a cumulative score (sum of all pairing scores) greater than the threshold, it is included as a qualifying city.</p>
-            <p>Connections are consolidated using a modified Kruskal's algorithm which selects the top 75% highest scoring direct lines to avoid redundancy.</p>
+            <p>Often there is no need for A-C when A-B-C exists. I have experimented with many different algorithms to address this scenario and the best I could come up to consolidate connections is an implementation of a modified Kruskal's algorithm which eliminates the bottom half of scoring pairs</p>
 
             <h3>Limitations:</h3>
             <p>These lines are "as the crow flies". It does not account for geographic obstacles like water, mountains, or existing infrastructure. More meticulous line consolidation would be necessary in real life. For major city pairs oftentimes the calculated lines flies straight there with little attention to regional stops.</p>
