@@ -557,13 +557,45 @@
 
 
         function calcScore(distance, pop1, pop2) {
-            if (distance >= 750) return 0
-            else {
-                if (distance < 5) return (pop1 * pop2 / 10000) / (Math.pow((5+distance*2), 2))
-                else if (distance < 50) return (pop1 * pop2 / 100000) / (Math.pow((10+distance), 2))
-                else return (1 - Math.abs((distance - 300) / 300)) * (pop1 * pop2 / 1000000) / (Math.pow((25+distance*0.36), 2))
-            }
-        }
+          // Define travel mode parameters
+          let speed, waitTime; // speed in mph, waitTime in hours
+      
+          if (distance < 5) {
+              // LRT / metro / commuter rail
+              speed = 30;
+              waitTime = 5 / 60; // 5 minutes
+          } else if (distance < 50) {
+              // Regional rail
+              speed = 60;
+              waitTime = 10 / 60; // 10 minutes
+          } else if (distance < 750) {
+              // HSR
+              speed = 166;
+              waitTime = 25 / 60; // 25 minutes
+          } else {
+              return 0; // Too far for rail
+          }
+      
+          // Travel time in hours
+          let travelTime = waitTime + distance / speed;
+      
+          // Base score from population
+          let popFactor = pop1 * pop2;
+      
+          // Distance/time penalty (squared travel time)
+          let score = popFactor / Math.pow(travelTime * 60, 2); // convert to minutes for scaling
+      
+          // Apply Gaussian factor for HSR to favor ~300 mi
+          if (distance >= 50) {
+              let ideal = 300;
+              let sigma = 150; // controls width of ideal range
+              let gaussian = Math.exp(-Math.pow(distance - ideal, 2) / (2 * sigma * sigma));
+              score *= gaussian;
+          }
+      
+          return score;
+      }
+
 
 
         const cityPairs = new Map();
