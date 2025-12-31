@@ -557,46 +557,35 @@
 
 
         function calcScore(distance, pop1, pop2) {
-          // Define travel mode parameters
-          let speed, waitTime; // speed in mph, waitTime in hours
+          // LRT weight
+          let wLRT = 1 / (1 + Math.exp((distance - 5)/2)); // high for <5 mi, decays after
+          // Regional weight
+          let wRegional = 1 / (1 + Math.exp((distance - 50)/10)) - 1 / (1 + Math.exp((distance - 5)/2));
+          // HSR weight
+          let wHSR = 1 / (1 + Math.exp((distance - 750)/50)) - 1 / (1 + Math.exp((distance - 50)/10));
       
-          if (distance < 5) {
-              // LRT / metro / commuter rail
-              speed = 30;
-              waitTime = 5 / 60; // 5 minutes
-          } else if (distance < 50) {
-              // Regional rail
-              speed = 60;
-              waitTime = 10 / 60; // 10 minutes
-          } else if (distance < 750) {
-              // HSR
-              speed = 166;
-              waitTime = 25 / 60; // 25 minutes
-          } else {
-              return 0; // Too far for rail
-          }
+          // Normalize weights
+          let sum = wLRT + wRegional + wHSR;
+          wLRT /= sum;
+          wRegional /= sum;
+          wHSR /= sum;
       
-          // Travel time in hours
+          // Speeds in mph and wait times in hours
+          let speed = wLRT * 30 + wRegional * 60 + wHSR * 166;
+          let waitTime = wLRT * (5/60) + wRegional * (10/60) + wHSR * (25/60);
+      
           let travelTime = waitTime + distance / speed;
       
-          // Base score from population
           let popFactor = pop1 * pop2;
+          let score = popFactor / Math.pow(travelTime * 60, 2);
       
-          // Distance/time penalty (squared travel time)
-          let score = popFactor / Math.pow(travelTime * 60, 2); // convert to minutes for scaling
-      
-          // Apply Gaussian factor for HSR to favor ~300 mi
-          if (distance >= 50) {
-              let ideal = 300;
-              let sigma = 150; // controls width of ideal range
-              let gaussian = Math.exp(-Math.pow(distance - ideal, 2) / (2 * sigma * sigma));
-              score *= gaussian;
-          }
+          // Gaussian for HSR preference (~300 mi)
+          let idealHSR = 300;
+          let sigma = 150;
+          score *= Math.exp(-Math.pow(distance - idealHSR, 2) / (2 * sigma * sigma) * wHSR);
       
           return score;
       }
-
-
 
         const cityPairs = new Map();
         for (let i=0; i<cities.length; i++) {
