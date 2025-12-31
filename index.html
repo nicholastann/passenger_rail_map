@@ -529,7 +529,7 @@
     }
 
 
-    let sliderValue = 150;
+    let sliderValue = 500;
 
     function updateValue(value) {
         sliderValue = value;
@@ -810,8 +810,8 @@
 <body>
     <div id="map"></div>
     <div id="sliderContainer">
-        <input type="range" oninput="updateValue(this.value)" id="slider" min="1" max="300" value="150" step="1">
-        <p id="sliderText">Threshold: <span id="sliderValue">150</span>
+        <input type="range" oninput="updateValue(this.value)" id="slider" min="100" max="1000" value="500" step="10">
+        <p id="sliderText">Threshold: <span id="sliderValue">500</span>
             <button id="infoButton">?</button>
         </p>
     </div>
