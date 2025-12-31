@@ -544,193 +544,116 @@
 
     function runSimulation() {
 
-        const threshold = getSliderValue();
+    const threshold = getSliderValue();
 
-
-        function calcDistance(lat1, long1, lat2, long2, cityA, cityB) {
-
-            const toRadians = (degrees) => degrees * (Math.PI / 180);
-            const a = Math.pow(Math.sin(toRadians(lat2 - lat1)/2), 2) + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.pow(Math.sin(toRadians(long2 - long1)/2), 2);
-
-            return 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-
-
-        function calcScore(distance, pop1, pop2) {
-          // LRT weight
-          let wLRT = 1 / (1 + Math.exp((distance - 5)/2)); // high for <5 mi, decays after
-          // Regional weight
-          let wRegional = 1 / (1 + Math.exp((distance - 50)/10)) - 1 / (1 + Math.exp((distance - 5)/2));
-          // HSR weight
-          let wHSR = 1 / (1 + Math.exp((distance - 750)/50)) - 1 / (1 + Math.exp((distance - 50)/10));
-      
-          // Normalize weights
-          let sum = wLRT + wRegional + wHSR;
-          wLRT /= sum;
-          wRegional /= sum;
-          wHSR /= sum;
-      
-          // Speeds in mph and wait times in hours
-          let speed = wLRT * 30 + wRegional * 60 + wHSR * 166;
-          let waitTime = wLRT * (5/60) + wRegional * (10/60) + wHSR * (25/60);
-      
-          let travelTime = waitTime + distance / speed;
-      
-          let popFactor = pop1 * pop2;
-          let score = popFactor / Math.pow(travelTime * 60, 2);
-      
-          // Gaussian for HSR preference (~300 mi)
-          let idealHSR = 300;
-          let sigma = 150;
-          score *= Math.exp(-Math.pow(distance - idealHSR, 2) / (2 * sigma * sigma) * wHSR);
-          score = score / 100000
-      
-          return score;
-      }
-
-        const cityPairs = new Map();
-        for (let i=0; i<cities.length; i++) {
-
-            const innerMap = new Map();
-
-            for (let j=0; j<cities.length; j++) {
-                if (j!==i) {
-                    const lat1 = cities[i].lat
-                    const long1 = cities[i].long
-                    const lat2 = cities[j].lat
-                    const long2 = cities[j].long
-                    const distance = calcDistance(lat1, long1, lat2, long2, cities[i].city, cities[j].city)
-                    const score = calcScore(distance, cities[i].population, cities[j].population)
-
-                    innerMap.set(cities[j].city, {score, distance, lat1, long1, lat2, long2});
-                }
-            }
-            cityPairs.set(cities[i].city, innerMap);
-        }
-        console.log("cityPairs", cityPairs)
-
-
-        function getQualifiedCities() {
-            return Array.from(cityPairs).reduce((qualifiedCities, [cityA, pairs]) => {
-                if (Array.from(pairs).reduce((sum, [_, data]) => sum + data.score, 0) > threshold) qualifiedCities.push(cityA);
-                return qualifiedCities;
-            }, []);
-        }
-
-
-        function createEdges(qualifiedCities) {
-            const edges = [];
-
-            for (let cityA of qualifiedCities) {
-                let connectingCities = [];
-
-                for (let cityB of qualifiedCities) {
-                    if (cityA !== cityB) {
-                        let data = cityPairs.get(cityA)?.get(cityB) || cityPairs.get(cityB)?.get(cityA);
-
-                        if (data && data.score > threshold) {
-                            connectingCities.push({
-                                city: cityB,
-                                score: data.score
-                            });
-                        }
-                    }
-                }
-                for (let connection of connectingCities) {
-                    edges.push({ start: cityA, end: connection.city});
-                }
-            }
-            return edges;
-        }
-
-
-         function modifiedKruskal(edges, extraEdgesLimit) {
-            const parent = new Map();
-                const rank = new Map();
-
-                for (const edge of edges) {
-                    if (!parent.has(edge.start)) {
-                        parent.set(edge.start, edge.start);
-                        rank.set(edge.start, 0);
-                    }
-                    if (!parent.has(edge.end)) {
-                        parent.set(edge.end, edge.end);
-                        rank.set(edge.end, 0);
-                    }
-                }
-
-                function find(city) {
-                    if (parent.get(city) !== city) parent.set(city, find(parent.get(city)));
-                    return parent.get(city);
-                }
-
-                function union(cityA, cityB) {
-                    const rootA = find(cityA);
-                    const rootB = find(cityB);
-
-                    if (rootA !== rootB) {
-                        const rankA = rank.get(rootA);
-                        const rankB = rank.get(rootB);
-
-                        if (rankA > rankB) parent.set(rootB, rootA);
-                        else if (rankA < rankB) parent.set(rootA, rootB);
-                        else {
-                            parent.set(rootB, rootA);
-                            rank.set(rootA, rankA + 1);
-                        }
-                    }
-                }
-
-                edges.sort((a, b) => {
-                    const dataA = cityPairs.get(a.start).get(a.end) || cityPairs.get(a.end).get(a.start);
-                    const dataB = cityPairs.get(b.start).get(b.end) || cityPairs.get(b.end).get(b.start);
-                    return dataB.score - dataA.score;
-                });
-
-                const mst = [];
-                const extraEdges = [];
-                let extraEdgesCount = 0;
-
-                for (const edge of edges) {
-                    const { start, end } = edge;
-
-                    if (find(start) !== find(end)) {
-                        mst.push(edge);
-                        union(start, end);
-                    }
-                }
-
-                for (const edge of edges) {
-                    const { start, end } = edge;
-
-                    if (find(start) === find(end)) {
-                        const data = cityPairs.get(start).get(end) || cityPairs.get(end).get(start);
-                        if (data && data.distance < 750 && extraEdgesCount < extraEdgesLimit) {
-                            extraEdges.push(edge);
-                            extraEdgesCount++;
-                            union(start, end);
-                        }
-                    }
-
-                    if (extraEdgesCount >= extraEdgesLimit) break;
-                }
-
-                const result = [...mst, ...extraEdges];
-                return result;
-        }
-
-
-        const qualifiedCities = getQualifiedCities();
-        const edges = createEdges(qualifiedCities);
-        const mstEdges = modifiedKruskal(edges, edges.length/2)
-
-        console.log("Qualified Cities:", qualifiedCities);
-        console.log("Created Edges:", edges);
-        console.log("consolidate Edges: ", mstEdges)
-
-
-        drawEdges(mstEdges, cityPairs)
+    function calcDistance(lat1, long1, lat2, long2) {
+        const toRadians = (degrees) => degrees * (Math.PI / 180);
+        const a = Math.pow(Math.sin(toRadians(lat2 - lat1)/2), 2) + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.pow(Math.sin(toRadians(long2 - long1)/2), 2);
+        return 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
+
+    function calcScore(distance, pop1, pop2) {
+        // LRT weight
+        let wLRT = 1 / (1 + Math.exp((distance - 5)/2));
+        let wRegional = 1 / (1 + Math.exp((distance - 50)/10)) - 1 / (1 + Math.exp((distance - 5)/2));
+        let wHSR = 1 / (1 + Math.exp((distance - 750)/50)) - 1 / (1 + Math.exp((distance - 50)/10));
+
+        let sum = wLRT + wRegional + wHSR;
+        wLRT /= sum;
+        wRegional /= sum;
+        wHSR /= sum;
+
+        let speed = wLRT * 30 + wRegional * 60 + wHSR * 166;
+        let waitTime = wLRT * (5/60) + wRegional * (10/60) + wHSR * (25/60);
+
+        let travelTime = waitTime + distance / speed;
+        let popFactor = pop1 * pop2;
+        let score = popFactor / Math.pow(travelTime * 60, 2);
+
+        // Gaussian for HSR preference (~300 mi)
+        let idealHSR = 300;
+        let sigma = 150;
+        score *= Math.exp(-Math.pow(distance - idealHSR, 2) / (2 * sigma * sigma) * wHSR);
+
+        score /= 100000;
+        return score;
+    }
+
+    // Step 1: Compute pairwise distances and scores
+    const cityPairs = new Map();
+    for (let i = 0; i < cities.length; i++) {
+        const innerMap = new Map();
+        for (let j = 0; j < cities.length; j++) {
+            if (i !== j) {
+                const lat1 = cities[i].lat, long1 = cities[i].long;
+                const lat2 = cities[j].lat, long2 = cities[j].long;
+                const distance = calcDistance(lat1, long1, lat2, long2);
+                const score = calcScore(distance, cities[i].population, cities[j].population);
+                innerMap.set(cities[j].city, { score, distance, lat1, long1, lat2, long2 });
+            }
+        }
+        cityPairs.set(cities[i].city, innerMap);
+    }
+
+    // Step 2: Identify hubs based on total score
+    const hubThreshold = threshold * 2; // tweakable
+    const hubs = cities.filter(city => {
+        const totalScore = Array.from(cityPairs.get(city.city)).reduce((sum, [_, data]) => sum + data.score, 0);
+        return totalScore > hubThreshold || city.population > 500000;
+    }).map(c => c.city);
+
+    // Step 3: Create edges between hubs (backbone network)
+    const edges = [];
+    for (let i = 0; i < hubs.length; i++) {
+        for (let j = i + 1; j < hubs.length; j++) {
+            const data = cityPairs.get(hubs[i]).get(hubs[j]);
+            if (data && data.score > threshold) {
+                edges.push({ start: hubs[i], end: hubs[j], score: data.score });
+            }
+        }
+    }
+
+    // Step 4: Assign smaller cities to nearest hub(s)
+    for (let city of cities) {
+        if (!hubs.includes(city.city)) {
+            let bestHub = null;
+            let bestScore = 0;
+            for (let hub of hubs) {
+                const data = cityPairs.get(city.city).get(hub);
+                if (data && data.score > bestScore) {
+                    bestScore = data.score;
+                    bestHub = hub;
+                }
+            }
+            if (bestHub) {
+                edges.push({ start: city.city, end: bestHub, score: bestScore });
+            }
+        }
+    }
+
+    // Step 5: Optional extra edges for high-score connections within the same hub cluster
+    const extraEdgesLimit = Math.floor(edges.length / 2);
+    let extraEdgesCount = 0;
+    for (let i = 0; i < cities.length; i++) {
+        for (let j = i + 1; j < cities.length; j++) {
+            const cityA = cities[i].city;
+            const cityB = cities[j].city;
+            if (edges.find(e => (e.start === cityA && e.end === cityB) || (e.start === cityB && e.end === cityA))) continue;
+
+            const data = cityPairs.get(cityA).get(cityB);
+            if (data && data.score > threshold && extraEdgesCount < extraEdgesLimit) {
+                edges.push({ start: cityA, end: cityB, score: data.score });
+                extraEdgesCount++;
+            }
+        }
+    }
+
+    console.log("Hubs:", hubs);
+    console.log("Edges:", edges);
+
+    drawEdges(edges, cityPairs);
+}
+
 
     document.addEventListener("DOMContentLoaded", initMap);
     </script>
