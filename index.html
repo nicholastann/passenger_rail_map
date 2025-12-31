@@ -583,7 +583,7 @@
           let idealHSR = 300;
           let sigma = 150;
           score *= Math.exp(-Math.pow(distance - idealHSR, 2) / (2 * sigma * sigma) * wHSR);
-          score = score / 10000
+          score = score / 100000
       
           return score;
       }
